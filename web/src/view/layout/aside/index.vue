@@ -1,4 +1,10 @@
 <template>
+<<<<<<< HEAD
+  <div>
+    <normal-mode v-if="config.side_mode === 'normal' || (device === 'mobile' && config.side_mode == 'head' ) || (device === 'mobile' && config.side_mode == 'combination' )" />
+    <head-mode v-if="config.side_mode === 'head' && device !== 'mobile'"/>
+    <combination-mode v-if="config.side_mode === 'combination' && device !== 'mobile'" :mode="mode"/>
+=======
   <div
     class="relative h-full  bg-white text-slate-700 dark:text-slate-300 dark:bg-slate-900 border-r shadow dark:shadow-gray-700"
     :class="isCollapse ? '' : '  px-2'"
@@ -42,10 +48,28 @@
         <DArrowRight />
       </el-icon>
     </div>
+>>>>>>> parent of 03e5bc51 (v2.6.6版本发布 (#1784))
   </div>
 </template>
 
 <script setup>
+<<<<<<< HEAD
+import NormalMode from "./normalMode.vue"
+import HeadMode from "./headMode.vue"
+import CombinationMode from "./combinationMode.vue"
+
+defineProps({
+  mode:{
+    type: String,
+    default: 'normal'
+  }
+})
+
+import { storeToRefs } from "pinia";
+import { useAppStore } from "@/pinia";
+const appStore = useAppStore();
+const { config, device } = storeToRefs(appStore);
+=======
 import AsideComponent from "@/view/layout/aside/asideComponent/index.vue";
 import { ref, provide, watchEffect, computed} from "vue";
 import { useRoute, useRouter } from "vue-router";
@@ -109,6 +133,7 @@ const toggleCollapse = () => {
   isCollapse.value = !isCollapse.value;
 };
 
+>>>>>>> parent of 03e5bc51 (v2.6.6版本发布 (#1784))
 </script>
 
 <style lang="scss">

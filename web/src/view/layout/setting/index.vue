@@ -111,7 +111,25 @@ const drawer = defineModel('drawer',{
   type : Boolean
 })
 
+<<<<<<< HEAD
+const options = ["dark", "light", "auto"];
+const sideModes = [
+  {
+    label : "正常模式",
+    value : "normal"
+  },
+  {
+    label : "顶部菜单栏模式",
+    value: "head"
+  },
+  {
+    label : "组合模式",
+    value: "combination"
+  }
+];
+=======
 const options = ['dark','light','auto']
+>>>>>>> parent of 03e5bc51 (v2.6.6版本发布 (#1784))
 
 const copyConfig = () => {
   const input = document.createElement('textarea')

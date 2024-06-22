@@ -2,9 +2,16 @@
   <div class="bg-gray-50 text-slate-700 dark:text-slate-500 dark:bg-slate-800 w-screen h-screen">
     <el-watermark v-if="config.show_watermark" :font="font" :z-index="9999" :gap="[180,150]" class="absolute inset-0 pointer-events-none" :content="userStore.userInfo.nickName" />
     <gva-header />
+<<<<<<< HEAD
+    <div class="flex flex-row w-full gva-container pt-16">
+      <gva-aside v-if="config.side_mode === 'normal' || (device === 'mobile' && config.side_mode == 'head' ) || (device === 'mobile' && config.side_mode == 'combination' )" />
+      <gva-aside v-if="config.side_mode === 'combination' && device !== 'mobile'" mode="normal"/>
+      <div class="flex-1 p-2 w-0 h-full">
+=======
     <div class="flex flex-row w-full gva-container  pt-16">
       <gva-aside />
       <div class="flex-1  w-0 h-full">
+>>>>>>> parent of 03e5bc51 (v2.6.6版本发布 (#1784))
         <gva-tabs v-if="config.showTabs" />
         <div class="overflow-auto" :class="config.showTabs? 'gva-container2' :'gva-container pt-1'">
           <router-view v-if="reloadFlag" v-slot="{ Component }">
