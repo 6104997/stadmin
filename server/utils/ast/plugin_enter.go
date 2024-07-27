@@ -2,6 +2,7 @@ package ast
 
 import (
 	"go/ast"
+	"go/token"
 	"io"
 )
 
@@ -35,122 +36,126 @@ func (a *PluginEnter) Parse(filename string, writer io.Writer) (file *ast.File, 
 }
 
 func (a *PluginEnter) Rollback(file *ast.File) error {
-	for i := 0; i < len(file.Decls); i++ {
-		v1, o1 := file.Decls[i].(*ast.GenDecl)
-		if o1 {
-			for j := 0; j < len(v1.Specs); j++ {
-				v2, o2 := v1.Specs[j].(*ast.ValueSpec)
-				if o2 {
-					for k := 0; k < len(v2.Values); k++ {
-						v3, o3 := v2.Values[k].(*ast.CallExpr)
-						if o3 {
-							for l := 0; l < len(v3.Args); l++ {
-								v4, o4 := v3.Args[l].(*ast.Ident)
-								if o4 {
-									v5, o5 := v4.Obj.Decl.(*ast.TypeSpec)
-									if o5 {
-										if v5.Name.Name != a.Type.Group() {
-											break
-										}
-										v6, o6 := v5.Type.(*ast.StructType)
-										if o6 {
-											for m := 0; m < len(v6.Fields.List); m++ {
-												v7, o7 := v6.Fields.List[m].Type.(*ast.Ident)
-												if len(v6.Fields.List[m].Names) >= 1 && v6.Fields.List[m].Names[0].Name == a.StructName && o7 && v7.Name == a.StructCamelName {
-													v6.Fields.List = append(v6.Fields.List[:m], v6.Fields.List[m+1:]...)
-													break
-												}
-											}
-										}
-									}
-								}
-							}
-						}
+	//回滚结构体内内容
+	var structType *ast.StructType
+	ast.Inspect(file, func(n ast.Node) bool {
+		switch x := n.(type) {
+		case *ast.TypeSpec:
+			if s, ok := x.Type.(*ast.StructType); ok {
+				structType = s
+				for i, field := range x.Type.(*ast.StructType).Fields.List {
+					if len(field.Names) > 0 && field.Names[0].Name == a.StructName {
+						s.Fields.List = append(s.Fields.List[:i], s.Fields.List[i+1:]...)
+						return false
 					}
-					if a.Type == TypePluginServiceEnter {
-						continue
-					}
-					if len(v2.Names) >= 1 && v2.Names[0].Name == a.ModuleName {
-						v1.Specs = append(v1.Specs[:j], v1.Specs[j+1:]...)
-						if len(v1.Specs) <= 1 {
-							_ = NewImport(a.ImportPath).Rollback(file)
+				}
+			}
+		}
+		return true
+	})
+
+	if len(structType.Fields.List) == 0 {
+		_ = NewImport(a.ImportPath).Rollback(file)
+	}
+
+	if a.Type == TypePluginServiceEnter {
+		return nil
+	}
+
+	//回滚变量内容
+	ast.Inspect(file, func(n ast.Node) bool {
+		genDecl, ok := n.(*ast.GenDecl)
+		if ok && genDecl.Tok == token.VAR {
+			for i, spec := range genDecl.Specs {
+				valueSpec, vsok := spec.(*ast.ValueSpec)
+				if vsok {
+					for _, name := range valueSpec.Names {
+						if name.Name == a.ModuleName {
+							genDecl.Specs = append(genDecl.Specs[:i], genDecl.Specs[i+1:]...)
+							return false
 						}
 					}
 				}
 			}
 		}
-	}
+		return true
+	})
+
 	return nil
 }
 
 func (a *PluginEnter) Injection(file *ast.File) error {
 	_ = NewImport(a.ImportPath).Injection(file)
-	for i := 0; i < len(file.Decls); i++ {
-		v1, o1 := file.Decls[i].(*ast.GenDecl)
-		if o1 {
-			for j := 0; j < len(v1.Specs); j++ {
-				v2, o2 := v1.Specs[j].(*ast.ValueSpec)
-				if o2 {
-					for k := 0; k < len(v2.Values); k++ {
-						v3, o3 := v2.Values[k].(*ast.CallExpr)
-						if o3 {
-							for l := 0; l < len(v3.Args); l++ {
-								v4, o4 := v3.Args[l].(*ast.Ident)
-								if o4 {
-									v5, o5 := v4.Obj.Decl.(*ast.TypeSpec)
-									if o5 {
-										if v5.Name.Name != a.Type.Group() {
-											continue
-										}
-										v6, o6 := v5.Type.(*ast.StructType)
-										if o6 {
-											var has bool
-											for m := 0; m < len(v6.Fields.List); m++ {
-												v7, o7 := v6.Fields.List[m].Type.(*ast.Ident)
-												if len(v6.Fields.List[m].Names) >= 1 && v6.Fields.List[m].Names[0].Name == a.StructName && o7 && v7.Name == a.StructCamelName {
-													has = true
-													continue
-												}
-											}
-											if !has {
-												field := &ast.Field{
-													Names: []*ast.Ident{{Name: a.StructName}},
-													Type:  &ast.Ident{Name: a.StructCamelName},
-												}
-												v6.Fields.List = append(v6.Fields.List, field)
-											}
-										}
-									}
-								}
-							}
-						}
-					}
-					if a.Type == TypePluginServiceEnter {
-						continue
-					}
-					var has bool
-					if len(v2.Names) >= 1 && v2.Names[0].Name == a.ModuleName {
+
+	has := false
+	hasVar := false
+	var firstStruct *ast.StructType
+	var varSpec *ast.GenDecl
+	//寻找是否存在结构且定位
+	ast.Inspect(file, func(n ast.Node) bool {
+		switch x := n.(type) {
+		case *ast.TypeSpec:
+			if s, ok := x.Type.(*ast.StructType); ok {
+				firstStruct = s
+				for _, field := range x.Type.(*ast.StructType).Fields.List {
+					if len(field.Names) > 0 && field.Names[0].Name == a.StructName {
 						has = true
-					}
-					if !has {
-						spec := &ast.ValueSpec{
-							Names: []*ast.Ident{{Name: a.ModuleName}},
-							Values: []ast.Expr{
-								&ast.SelectorExpr{
-									X: &ast.SelectorExpr{
-										X:   &ast.Ident{Name: a.PackageName},
-										Sel: &ast.Ident{Name: a.GroupName},
-									},
-									Sel: &ast.Ident{Name: a.ServiceName},
-								},
-							},
-						}
-						v1.Specs = append(v1.Specs, spec)
+						return false
 					}
 				}
 			}
 		}
+		return true
+	})
+
+	if !has {
+		field := &ast.Field{
+			Names: []*ast.Ident{{Name: a.StructName}},
+			Type:  &ast.Ident{Name: a.StructCamelName},
+		}
+		firstStruct.Fields.List = append(firstStruct.Fields.List, field)
 	}
+
+	if a.Type == TypePluginServiceEnter {
+		return nil
+	}
+
+	//寻找是否存在变量且定位
+	ast.Inspect(file, func(n ast.Node) bool {
+		genDecl, ok := n.(*ast.GenDecl)
+		if ok && genDecl.Tok == token.VAR {
+			for _, spec := range genDecl.Specs {
+				valueSpec, vsok := spec.(*ast.ValueSpec)
+				if vsok {
+					varSpec = genDecl
+					for _, name := range valueSpec.Names {
+						if name.Name == a.ModuleName {
+							hasVar = true
+							return false
+						}
+					}
+				}
+			}
+		}
+		return true
+	})
+
+	if !hasVar {
+		spec := &ast.ValueSpec{
+			Names: []*ast.Ident{{Name: a.ModuleName}},
+			Values: []ast.Expr{
+				&ast.SelectorExpr{
+					X: &ast.SelectorExpr{
+						X:   &ast.Ident{Name: a.PackageName},
+						Sel: &ast.Ident{Name: a.GroupName},
+					},
+					Sel: &ast.Ident{Name: a.ServiceName},
+				},
+			},
+		}
+		varSpec.Specs = append(varSpec.Specs, spec)
+	}
+
 	return nil
 }
 
